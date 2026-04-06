@@ -10,6 +10,7 @@ Instructions:
 """
 
 import os
+import sys
 import time
 from typing import Any, Callable
 
@@ -25,6 +26,7 @@ COST_PER_1K_OUTPUT_TOKENS = {
 
 OPENAI_MODEL = "gpt-4o"
 OPENAI_MINI_MODEL = "gpt-4o-mini"
+PATCHABLE_MODULE_ALIAS = "student_solution"
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +295,37 @@ def format_comparison_table(results: list[dict]) -> str:
         lines.append(_row(row))
 
     return "\n".join(lines)
+
+
+def _register_patchable_module_alias() -> None:
+    """
+    Expose this module under a valid import name for unittest.mock.patch.
+
+    The test loader imports this file with a synthetic module name derived from the
+    day folder. If that folder starts with digits, patch("pkg.attr") rejects the
+    name. Registering a stable alias keeps patch-based tests working.
+    """
+    if __name__.isidentifier():
+        return
+
+    current_module = sys.modules.get(__name__)
+    if current_module is None:
+        return
+
+    sys.modules[PATCHABLE_MODULE_ALIAS] = current_module
+    for fn_name in (
+        "call_openai",
+        "call_openai_mini",
+        "compare_models",
+        "streaming_chatbot",
+        "retry_with_backoff",
+        "batch_compare",
+        "format_comparison_table",
+    ):
+        getattr(current_module, fn_name).__module__ = PATCHABLE_MODULE_ALIAS
+
+
+_register_patchable_module_alias()
 
 
 # ---------------------------------------------------------------------------
